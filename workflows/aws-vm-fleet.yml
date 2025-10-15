@@ -1,0 +1,89 @@
+name: Deploy App to AWS VM Fleet
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  HUMANITEC_ORG: # TO_BE_REPLACED
+  PROJECT_ID: # TO_BE_REPLACED  
+  ENVIRONMENT_ID: dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Build and push container image
+      run: |
+        echo "Building container image for app..."
+        
+        # Login to GitHub Container Registry
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        
+        # Build image
+        docker build -t ghcr.io/${{ github.repository_owner }}/${{ env.PROJECT_ID }}:${{ github.sha }} .
+        docker tag ghcr.io/${{ github.repository_owner }}/${{ env.PROJECT_ID }}:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/${{ env.PROJECT_ID }}:latest
+        
+        # Push image
+        docker push ghcr.io/${{ github.repository_owner }}/${{ env.PROJECT_ID }}:${{ github.sha }}
+        docker push ghcr.io/${{ github.repository_owner }}/${{ env.PROJECT_ID }}:latest
+        
+        echo "Container image pushed: ghcr.io/${{ github.repository_owner }}/${{ env.PROJECT_ID }}:latest"
+
+    - name: Install Humanitec CLI
+      run: |
+        curl -L -o hctl_linux_amd64.tar.gz https://github.com/humanitec/hctl/releases/download/v1.41.0/hctl_1.41.0_linux_amd64.tar.gz
+        tar -xzf hctl_linux_amd64.tar.gz
+        sudo install -o root -g root -m 0755 hctl /usr/local/bin/hctl
+        hctl --version
+
+    - name: Setup Humanitec Infrastructure
+      env:
+        HUMANITEC_AUTH_TOKEN: ${{ secrets.HUMANITEC_TOKEN }}
+      run: |
+        echo "Setting up Humanitec infrastructure..."
+        
+        # Create project if it doesn't exist
+        hctl create project $PROJECT_ID || echo "Project may already exist"
+        
+        # Create environment if it doesn't exist  
+        hctl create environment $PROJECT_ID $ENVIRONMENT_ID --set env_type_id=humanitec-11wcie-development || echo "Environment may already exist"
+
+    - name: Deploy to Humanitec
+      env:
+        HUMANITEC_AUTH_TOKEN: ${{ secrets.HUMANITEC_TOKEN }}
+      run: |
+        echo "Deploying application..."
+        echo "Organization: $HUMANITEC_ORG"
+        echo "Project: $PROJECT_ID"
+        echo "Environment: $ENVIRONMENT_ID"
+        
+        # Deploy
+        hctl deploy $PROJECT_ID $ENVIRONMENT_ID deployment.yaml --no-prompt --runner-logs-level debug
+        
+        echo ""
+        echo "🚀 APPLICATION DEPLOYED SUCCESSFULLY!"
+        echo "🔗 Find your load balancer at: https://console.aws.amazon.com/ec2/v2/home#LoadBalancers:"
+        echo "🔍 Look for load balancer with name containing 'vm-'"
+        echo "📱 The application runs on port 80 of the load balancer"
+        echo ""

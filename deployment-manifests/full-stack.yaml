@@ -1,0 +1,28 @@
+shared:
+  compute:
+    type: vm-fleet
+  database:
+    type: postgres
+  storage:
+    type: s3
+
+workloads:
+  APP_NAME_PLACEHOLDER:
+    variables:
+      # Compute connection
+      LOAD_BALANCER_URL: "http://${shared.compute.outputs.loadbalancer_ip}"
+      
+      # Database connection
+      DATABASE_URL: "${shared.database.outputs.connection_string}"
+      DB_HOST: "${shared.database.outputs.hostname}"
+      DB_PORT: "${shared.database.outputs.port}"
+      DB_NAME: "${shared.database.outputs.database}"
+      DB_USER: "${shared.database.outputs.username}"
+      DB_PASSWORD: "${shared.database.outputs.password}"
+      
+      # Storage connection
+      S3_BUCKET: "${shared.storage.outputs.bucket_name}"
+      S3_BUCKET_URL: "${shared.storage.outputs.bucket_url}"
+      AWS_ACCESS_KEY_ID: "${shared.storage.outputs.access_key_id}"
+      AWS_SECRET_ACCESS_KEY: "${shared.storage.outputs.secret_access_key}"
+      AWS_REGION: "${shared.storage.outputs.region}"

@@ -1,0 +1,8 @@
+shared:
+  compute:
+    type: vm-fleet
+
+workloads:
+  APP_NAME_PLACEHOLDER:
+    variables:
+      LOAD_BALANCER_URL: "http://${shared.compute.outputs.loadbalancer_ip}"
