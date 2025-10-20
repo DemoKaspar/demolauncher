@@ -13,6 +13,7 @@ APP_NAME = "todo-app"
 CLOUD = "aws"  # aws, gcp, azure
 COMPUTE = "vm-fleet"  # vm-fleet, serverless, kubernetes
 RESOURCES = ["postgres", "s3"]  # postgres, mysql, redis, s3, secrets, dns
+# Note: postgres creates both overprovisioned and standard versions for cost demos
 RUNNER = "ecs-runner"  # ecs-runner, gke-runner, aci-runner
 
 # Validate combinations
@@ -54,18 +55,33 @@ hctl create environment ${PROJECT_ID} dev --set env_type_id=${RUNNER_ENV_TYPE}
 # 3. Create modules
 hctl create module ${PROJECT_ID}-${COMPUTE} \
   --set resource_type=${COMPUTE} \
-  --set module_source="git::https://github.com/USER/infrastructure-templates.git//templates/${CLOUD}/${COMPUTE}"
+  --set module_source="git::https://github.com/DemoKaspar/humanitec-terraform-modules.git//${COMPUTE}"
 
 for resource in ${RESOURCES}; do
-  hctl create module ${PROJECT_ID}-${resource} \
-    --set resource_type=${resource} \
-    --set module_source="git::https://github.com/USER/infrastructure-templates.git//templates/${CLOUD}/resources/${resource}"
+  # For postgres, create both overprovisioned and standard versions for downsizing demos
+  if [[ ${resource} == "postgres" ]]; then
+    hctl create module ${PROJECT_ID}-postgres-overprovisioned \
+      --set resource_type=postgres \
+      --set module_source="git::https://github.com/DemoKaspar/humanitec-terraform-modules.git//postgres-overprovisioned"
+    hctl create module ${PROJECT_ID}-postgres-standard \
+      --set resource_type=postgres \
+      --set module_source="git::https://github.com/DemoKaspar/humanitec-terraform-modules.git//postgres-standard"
+  else
+    hctl create module ${PROJECT_ID}-${resource} \
+      --set resource_type=${resource} \
+      --set module_source="git::https://github.com/DemoKaspar/humanitec-terraform-modules.git//resources/${resource}"
+  fi
 done
 
 # 4. Create module rules
 hctl create module-rule --set module_id=${PROJECT_ID}-${COMPUTE} --set project_id=${PROJECT_ID}
 for resource in ${RESOURCES}; do
-  hctl create module-rule --set module_id=${PROJECT_ID}-${resource} --set project_id=${PROJECT_ID}
+  # For postgres, start with overprovisioned version (can be switched to standard later for cost demos)
+  if [[ ${resource} == "postgres" ]]; then
+    hctl create module-rule --set module_id=${PROJECT_ID}-postgres-overprovisioned --set project_id=${PROJECT_ID}
+  else
+    hctl create module-rule --set module_id=${PROJECT_ID}-${resource} --set project_id=${PROJECT_ID}
+  fi
 done
 ```
 
