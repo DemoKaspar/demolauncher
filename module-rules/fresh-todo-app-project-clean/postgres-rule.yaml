@@ -1,0 +1,33 @@
+# Module Rule Configuration for PostgreSQL
+# Project: fresh-todo-app-project-clean
+# Environment: dev
+# Resource Type: postgres
+
+apiVersion: v1
+kind: ModuleRule
+metadata:
+  project_id: fresh-todo-app-project-clean
+  resource_type: postgres
+  resource_class: default
+  policy: cost-optimization-2024
+
+# BEFORE: Overprovisioned Configuration  
+# module_id: fresh-postgres-overprovisioned
+# cost_profile: high
+# instance_class: db.t3.small
+# storage: 100GB gp3
+# features: performance_insights_enabled
+
+# AFTER: Cost-Optimized Configuration (Applied by Cortex Policy)
+module_id: fresh-postgres-standard
+cost_profile: optimized
+instance_class: db.t3.micro
+storage: 20GB gp2
+features: basic_monitoring
+
+# Policy Enforcement Details
+policy_trigger:
+  reason: "Database utilization < 30% for 7 days"
+  detected_by: cortex-policy-engine
+  enforcement_date: "2025-10-20T11:56:48Z"
+  estimated_savings: "60% cost reduction"
